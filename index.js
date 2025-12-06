@@ -29,6 +29,12 @@ async function run() {
     const usersCollection = db.collection("users");
 
     // Users Related APIs
+    app.get("/users", async (req, res) => {
+      const cursor = usersCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/users", async (req, res) => {
       const userInfo = req.body;
       const email = userInfo.userEmail;
