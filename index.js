@@ -66,7 +66,13 @@ async function run() {
 
     // Products Related APIs
     app.get("/all-products", async (req, res) => {
-      const cursor = productsCollection.find().sort({createdAt: -1});
+      const cursor = productsCollection.find().sort({ createdAt: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get("/all-products-limited", async (req, res) => {
+      const cursor = productsCollection.find().sort({ createdAt: -1 }).limit(6);
       const result = await cursor.toArray();
       res.send(result);
     });
