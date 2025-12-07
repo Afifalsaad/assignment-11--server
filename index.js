@@ -66,8 +66,15 @@ async function run() {
 
     // Products Related APIs
     app.get("/all-products", async (req, res) => {
-      const cursor = productsCollection.find();
+      const cursor = productsCollection.find().sort({createdAt: -1});
       const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.get("/productDetails/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productsCollection.findOne(query);
       res.send(result);
     });
 
