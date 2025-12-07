@@ -27,6 +27,7 @@ async function run() {
 
     const db = client.db("assignment_11_DB");
     const usersCollection = db.collection("users");
+    const productsCollection = db.collection("products");
 
     // Users Related APIs
     app.get("/users", async (req, res) => {
@@ -43,7 +44,7 @@ async function run() {
       const updatedRole = {
         $set: {
           role: role,
-          status: status
+          status: status,
         },
       };
       const result = await usersCollection.updateOne(query, updatedRole);
@@ -60,6 +61,15 @@ async function run() {
       }
 
       const result = await usersCollection.insertOne(userInfo);
+      res.send(result);
+    });
+
+    // Products Related APIs
+    app.post("/products", async (req, res) => {
+      const productDetails = req.body;
+      productDetails.show_on_home = "false";
+      productDetails.createdAt = new Date().toLocaleString();
+      const result = await productsCollection.insertOne(productDetails);
       res.send(result);
     });
 
