@@ -65,10 +65,16 @@ async function run() {
     });
 
     // Products Related APIs
+    app.get("/all-products", async (req, res) => {
+      const cursor = productsCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/products", async (req, res) => {
       const productDetails = req.body;
       productDetails.show_on_home = "false";
-      productDetails.createdAt = new Date().toLocaleString();
+      productDetails.createdAt = new Date();
       const result = await productsCollection.insertOne(productDetails);
       res.send(result);
     });
