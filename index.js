@@ -28,6 +28,7 @@ async function run() {
     const db = client.db("assignment_11_DB");
     const usersCollection = db.collection("users");
     const productsCollection = db.collection("products");
+    const orderedProductsCollection = db.collection("orderedProducts");
 
     // Users Related APIs
     app.get("/users", async (req, res) => {
@@ -96,6 +97,13 @@ async function run() {
       productDetails.show_on_home = "false";
       productDetails.createdAt = new Date();
       const result = await productsCollection.insertOne(productDetails);
+      res.send(result);
+    });
+
+    app.post("/order-product", async (req, res) => {
+      const orderDetails = req.body;
+      orderDetails.orderedAt = new Date();
+      const result = await orderedProductsCollection.insertOne(orderDetails);
       res.send(result);
     });
 
