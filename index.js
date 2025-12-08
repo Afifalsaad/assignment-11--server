@@ -146,7 +146,7 @@ async function run() {
         ],
         mode: "payment",
         metadata: {
-          parcelId: paymentInfo.id,
+          orderId: paymentInfo.id,
         },
         customer_email: paymentInfo.email,
         success_url: `${process.env.DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
@@ -154,6 +154,29 @@ async function run() {
       });
 
       res.send({ url: session.url });
+    });
+
+    app.patch("/payment-success", async (req, res) => {
+      const sessionId = req.query.session_id;
+      console.log("sessionId", sessionId);
+
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      console.log("session retrieve", session);
+      if (session.payment_status === "paid") {
+        const id = session.metadata.orderId;
+        const query = { _id: new ObjectId(id) };
+        const updatedInfo = {
+          $set: {
+            payment_status: "paid",
+          },
+        };
+
+        const result = await orderedProductsCollection.updateOne(
+          query,
+          updatedInfo
+        );
+        res.send(result);
+      }
     });
 
     // Send a ping to confirm a successful connection
