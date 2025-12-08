@@ -183,7 +183,17 @@ async function run() {
     // Suspend related APIs
     app.post("/suspend/:id", async (req, res) => {
       const reason = req.body;
-      reason.userId = req.params.id;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      reason.userId = id;
+      const updatedRole = {
+        $set: {
+          role: "suspended",
+          status: "suspended",
+        },
+      };
+      await usersCollection.updateOne(query, updatedRole);
+
       const result = await suspendedCollection.insertOne(reason);
       res.send(result);
     });
