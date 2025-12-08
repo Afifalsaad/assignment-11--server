@@ -30,6 +30,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const productsCollection = db.collection("products");
     const orderedProductsCollection = db.collection("orderedProducts");
+    const suspendedCollection = db.collection("suspended");
 
     // Users Related APIs
     app.get("/users", async (req, res) => {
@@ -177,6 +178,14 @@ async function run() {
         );
         res.send(result);
       }
+    });
+
+    // Suspend related APIs
+    app.post("/suspend/:id", async (req, res) => {
+      const reason = req.body;
+      reason.userId = req.params.id;
+      const result = await suspendedCollection.insertOne(reason);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
