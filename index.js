@@ -4,6 +4,7 @@ const app = express();
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 3000;
+const stripe = require("stripe")(process.env.STRIPE_ID);
 
 // middleware
 app.use(express.json());
@@ -74,9 +75,17 @@ async function run() {
 
     // Products Related APIs
     app.get("/all-products", async (req, res) => {
-      const cursor = productsCollection.find().sort({ createdAt: -1 });
+      const { limit, skip } = req.query;
+      const cursor = productsCollection
+        .find()
+        .limit(Number(limit))
+        .skip(Number(skip))
+        .sort({ createdAt: -1 });
       const result = await cursor.toArray();
-      res.send(result);
+
+      const count = await productsCollection.countDocuments();
+
+      res.send({ result, totalProducts: count });
     });
 
     app.get("/all-products-limited", async (req, res) => {
@@ -105,6 +114,46 @@ async function run() {
       orderDetails.orderedAt = new Date();
       const result = await orderedProductsCollection.insertOne(orderDetails);
       res.send(result);
+    });
+
+    // Orders Related APIs
+    app.get("/my-orders", async (req, res) => {
+      const email = req.query.email;
+      const query = { email };
+      const result = await orderedProductsCollection
+        .find(query)
+        .sort({ orderedAt: -1 })
+        .toArray();
+      res.send(result);
+    });
+
+    // Payment Related APIs
+    app.post("/payment-checkout-session", async (req, res) => {
+      const paymentInfo = req.body;
+      const amount = parseInt(paymentInfo.order_price) * 100;
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price_data: {
+              currency: "BDT",
+              unit_amount: amount,
+              product_data: {
+                name: `Please pay for ${paymentInfo.title}`,
+              },
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        metadata: {
+          parcelId: paymentInfo.id,
+        },
+        customer_email: paymentInfo.email,
+        success_url: `${process.env.DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.DOMAIN}/dashboard/payment-cancelled?`,
+      });
+
+      res.send({ url: session.url });
     });
 
     // Send a ping to confirm a successful connection
