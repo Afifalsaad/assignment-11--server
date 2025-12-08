@@ -90,7 +90,14 @@ async function run() {
     });
 
     app.get("/all-products-limited", async (req, res) => {
-      const cursor = productsCollection.find().sort({ createdAt: -1 }).limit(6);
+      const query = {};
+      if (req.query.show_on_home) {
+        query.show_on_home = req.query.show_on_home === "true";
+      }
+      const cursor = productsCollection
+        .find(query)
+        .sort({ createdAt: -1 })
+        .limit(6);
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -104,7 +111,7 @@ async function run() {
 
     app.post("/products", async (req, res) => {
       const productDetails = req.body;
-      productDetails.show_on_home = "false";
+      productDetails.show_on_home = false;
       productDetails.createdAt = new Date();
       const result = await productsCollection.insertOne(productDetails);
       res.send(result);
@@ -114,6 +121,20 @@ async function run() {
       const orderDetails = req.body;
       orderDetails.orderedAt = new Date();
       const result = await orderedProductsCollection.insertOne(orderDetails);
+      res.send(result);
+    });
+
+    app.patch("/show-on-home/:id", async (req, res) => {
+      const id = req.params.id;
+      const show_on_home = req.body.show_on_home;
+      const query = { _id: new ObjectId(id) };
+      const updatedInfo = {
+        $set: {
+          show_on_home: !show_on_home,
+          clickedAt: new Date(),
+        },
+      };
+      const result = await productsCollection.updateOne(query, updatedInfo);
       res.send(result);
     });
 
@@ -159,10 +180,8 @@ async function run() {
 
     app.patch("/payment-success", async (req, res) => {
       const sessionId = req.query.session_id;
-      console.log("sessionId", sessionId);
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log("session retrieve", session);
       if (session.payment_status === "paid") {
         const id = session.metadata.orderId;
         const query = { _id: new ObjectId(id) };
