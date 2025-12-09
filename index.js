@@ -124,6 +124,25 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/updateProduct/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const productInfo = req.body;
+      const updatedInfo = {
+        $set: {
+          name: productInfo.name,
+          description: productInfo.description,
+          category: productInfo.category,
+          image: productInfo.images[0],
+          demoVideo: productInfo.demoVideo[0],
+          payment_option: productInfo.payment_option,
+        },
+      };
+      console.log(updatedInfo, id);
+      const result = await productsCollection.updateOne(query, updatedInfo);
+      res.send(result);
+    });
+
     app.patch("/show-on-home/:id", async (req, res) => {
       const id = req.params.id;
       const show_on_home = req.body.show_on_home;
