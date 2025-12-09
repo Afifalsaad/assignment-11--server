@@ -133,8 +133,8 @@ async function run() {
           name: productInfo.name,
           description: productInfo.description,
           category: productInfo.category,
-          image: productInfo.images[0],
-          demoVideo: productInfo.demoVideo[0],
+          image: productInfo.image,
+          demo_video: productInfo.demo_video,
           payment_option: productInfo.payment_option,
         },
       };
@@ -154,6 +154,13 @@ async function run() {
         },
       };
       const result = await productsCollection.updateOne(query, updatedInfo);
+      res.send(result);
+    });
+
+    app.delete("/delete-product/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productsCollection.deleteOne(query);
       res.send(result);
     });
 
