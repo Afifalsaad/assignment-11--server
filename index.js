@@ -117,13 +117,6 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/order-product", async (req, res) => {
-      const orderDetails = req.body;
-      orderDetails.orderedAt = new Date();
-      const result = await orderedProductsCollection.insertOne(orderDetails);
-      res.send(result);
-    });
-
     app.patch("/updateProduct/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -172,6 +165,19 @@ async function run() {
         .find(query)
         .sort({ orderedAt: -1 })
         .toArray();
+      res.send(result);
+    });
+
+    app.get("/all-orders", async (req, res) => {
+      const cursor = orderedProductsCollection.find();
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+    app.post("/order-product", async (req, res) => {
+      const orderDetails = req.body;
+      orderDetails.orderedAt = new Date();
+      const result = await orderedProductsCollection.insertOne(orderDetails);
       res.send(result);
     });
 
