@@ -119,6 +119,17 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/pending-orders", async (req, res) => {
+      const owner_email = req.query.email;
+      const status = req.query.status;
+      const query = {
+        owner_email,
+        status,
+      };
+      const result = await orderedProductsCollection.find(query).toArray();
+      res.send(result);
+    });
+
     app.post("/products", async (req, res) => {
       const productDetails = req.body;
       productDetails.show_on_home = false;
