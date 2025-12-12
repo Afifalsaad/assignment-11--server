@@ -89,6 +89,16 @@ async function run() {
       res.send({ result, totalProducts: count });
     });
 
+    app.get("/my-products", async (req, res) => {
+      const email = req.query.email;
+      const query = { email };
+      const result = await productsCollection
+        .find(query)
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.send(result);
+    });
+
     app.get("/all-products-limited", async (req, res) => {
       const query = {};
       if (req.query.show_on_home) {
@@ -129,6 +139,7 @@ async function run() {
           image: productInfo.image,
           demo_video: productInfo.demo_video,
           payment_option: productInfo.payment_option,
+          updated_by: productInfo.updated_by,
         },
       };
       console.log(updatedInfo, id);
@@ -169,7 +180,7 @@ async function run() {
     });
 
     app.get("/all-orders", async (req, res) => {
-      const cursor = orderedProductsCollection.find();
+      const cursor = orderedProductsCollection.find().sort({ orderedAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
     });
