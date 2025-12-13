@@ -119,17 +119,6 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/pending-orders", async (req, res) => {
-      const owner_email = req.query.email;
-      const status = req.query.status;
-      const query = {
-        owner_email,
-        status,
-      };
-      const result = await orderedProductsCollection.find(query).toArray();
-      res.send(result);
-    });
-
     app.post("/products", async (req, res) => {
       const productDetails = req.body;
       productDetails.show_on_home = false;
@@ -196,6 +185,28 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/pending-orders", async (req, res) => {
+      const owner_email = req.query.email;
+      const status = req.query.status;
+      const query = {
+        owner_email,
+        status,
+      };
+      const result = await orderedProductsCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    app.get("/approved-order", async (req, res) => {
+      const email = req.query.email;
+      const status = req.query.status;
+      const query = { owner_email: email, status };
+      const result = await orderedProductsCollection
+        .find(query)
+        .sort({ orderedAt: -1 })
+        .toArray();
+      res.send(result);
+    });
+
     app.post("/order-product", async (req, res) => {
       const orderDetails = req.body;
       orderDetails.orderedAt = new Date();
@@ -216,6 +227,46 @@ async function run() {
       const result = await orderedProductsCollection.updateOne(
         query,
         updatedStatus
+      );
+      res.send(result);
+    });
+
+    app.patch("/reject-order/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedStatus = {
+        $set: {
+          status: "rejected",
+        },
+      };
+
+      const result = await orderedProductsCollection.updateOne(
+        query,
+        updatedStatus
+      );
+      res.send(result);
+    });
+
+    app.patch("/tracking-log/:id", async (req, res) => {
+      const { location, status, date_time } = req.body;
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const approvedInfo = {
+        $push: {
+          tracking: {
+            status,
+            location,
+            date_time,
+          },
+        },
+        $set: {
+          status,
+        },
+      };
+
+      const result = await orderedProductsCollection.updateOne(
+        query,
+        approvedInfo
       );
       res.send(result);
     });
