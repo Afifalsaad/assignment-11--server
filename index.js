@@ -203,6 +203,23 @@ async function run() {
       res.send(result);
     });
 
+    app.patch("/approve-order/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const updatedStatus = {
+        $set: {
+          status: "approved",
+          approvedAt: new Date(),
+        },
+      };
+
+      const result = await orderedProductsCollection.updateOne(
+        query,
+        updatedStatus
+      );
+      res.send(result);
+    });
+
     // Payment Related APIs
     app.post("/payment-checkout-session", async (req, res) => {
       const paymentInfo = req.body;
