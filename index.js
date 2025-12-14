@@ -44,7 +44,7 @@ async function run() {
       const log = {
         trackingId,
         status,
-        details: status,
+        details: status.split("-").join(" "),
         createdAt: new Date(),
       };
 
@@ -293,7 +293,6 @@ async function run() {
             date_time,
           },
         },
-        
       };
 
       const result = await orderedProductsCollection.updateOne(
@@ -407,6 +406,15 @@ async function run() {
       await usersCollection.updateOne(query, updatedRole);
 
       const result = await suspendedCollection.insertOne(reason);
+      res.send(result);
+    });
+
+    // Trackings Related APIs
+    app.get("/trackings/:trackingId/log", async (req, res) => {
+      const trackingId = req.params.trackingId;
+      console.log(trackingId);
+      const query = { trackingId };
+      const result = await trackingsCollection.find(query).toArray();
       res.send(result);
     });
 
