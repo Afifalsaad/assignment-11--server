@@ -5,6 +5,12 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 3000;
 const stripe = require("stripe")(process.env.STRIPE_ID);
+const crypto = require("crypto");
+
+function generateTrackingId() {
+  const random = crypto.randomBytes(5).toString("hex").toUpperCase();
+  return `production-${random}`;
+}
 
 // middleware
 app.use(express.json());
@@ -31,6 +37,20 @@ async function run() {
     const productsCollection = db.collection("products");
     const orderedProductsCollection = db.collection("orderedProducts");
     const suspendedCollection = db.collection("suspended");
+    const trackingsCollection = db.collection("trackings");
+    const paymentsCollection = db.collection("payments");
+
+    const logTracking = async (trackingId, status) => {
+      const log = {
+        trackingId,
+        status,
+        details: status,
+        createdAt: new Date(),
+      };
+
+      const result = await trackingsCollection.insertOne(log);
+      return result;
+    };
 
     // Users Related APIs
     app.get("/users", async (req, res) => {
@@ -142,7 +162,6 @@ async function run() {
           updated_by: productInfo.updated_by,
         },
       };
-      console.log(updatedInfo, id);
       const result = await productsCollection.updateOne(query, updatedInfo);
       res.send(result);
     });
@@ -192,7 +211,10 @@ async function run() {
         owner_email,
         status,
       };
-      const result = await orderedProductsCollection.find(query).toArray();
+      const result = await orderedProductsCollection
+        .find(query)
+        .sort({ orderedAt: -1 })
+        .toArray();
       res.send(result);
     });
 
@@ -209,13 +231,22 @@ async function run() {
 
     app.post("/order-product", async (req, res) => {
       const orderDetails = req.body;
+      const trackingId = generateTrackingId();
+      console.log(trackingId);
       orderDetails.orderedAt = new Date();
+      orderDetails.trackingId = trackingId;
+
+      logTracking(trackingId, "order-placed");
+
       const result = await orderedProductsCollection.insertOne(orderDetails);
+      console.log(result, trackingId);
       res.send(result);
     });
 
     app.patch("/approve-order/:id", async (req, res) => {
       const id = req.params.id;
+      const { trackingId } = req.body;
+      console.log(trackingId);
       const query = { _id: new ObjectId(id) };
       const updatedStatus = {
         $set: {
@@ -223,6 +254,9 @@ async function run() {
           approvedAt: new Date(),
         },
       };
+
+      // log tracking
+      logTracking(trackingId, "approved");
 
       const result = await orderedProductsCollection.updateOne(
         query,
@@ -248,7 +282,7 @@ async function run() {
     });
 
     app.patch("/tracking-log/:id", async (req, res) => {
-      const { location, status, date_time } = req.body;
+      const { location, status, date_time, trackingId } = req.body;
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const approvedInfo = {
@@ -259,15 +293,15 @@ async function run() {
             date_time,
           },
         },
-        $set: {
-          status,
-        },
+        
       };
 
       const result = await orderedProductsCollection.updateOne(
         query,
         approvedInfo
       );
+      // log-tracking
+      logTracking(trackingId, status);
       res.send(result);
     });
 
@@ -291,6 +325,8 @@ async function run() {
         mode: "payment",
         metadata: {
           orderId: paymentInfo.id,
+          productName: paymentInfo.title,
+          trackingId: paymentInfo.trackingId,
         },
         customer_email: paymentInfo.email,
         success_url: `${process.env.DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`,
@@ -304,12 +340,26 @@ async function run() {
       const sessionId = req.query.session_id;
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      console.log(session);
+      const trackingId = session.metadata.trackingId;
+      const transactionId = session.payment_intent;
+      const query = { transactionId: transactionId };
+      const isExist = await paymentsCollection.findOne(query);
+      if (isExist) {
+        return res.send({
+          transactionId,
+          message: "already paid",
+          trackingId: isExist.trackingId,
+        });
+      }
+
       if (session.payment_status === "paid") {
         const id = session.metadata.orderId;
         const query = { _id: new ObjectId(id) };
         const updatedInfo = {
           $set: {
             payment_status: "paid",
+            trackingId: trackingId,
           },
         };
 
@@ -317,7 +367,28 @@ async function run() {
           query,
           updatedInfo
         );
-        res.send(result);
+
+        const payment = {
+          customerEmail: session.customer_email,
+          amount: session.amount_total / 100,
+          currency: session.currency,
+          parcelId: session.metadata.orderId,
+          parcelName: session.metadata.productName,
+          transactionId: session.payment_intent,
+          paymentStatus: session.payment_status,
+          paidAt: new Date(),
+          trackingId: trackingId,
+        };
+
+        logTracking(trackingId, "parcel-paid");
+        const paymentResult = await paymentsCollection.insertOne(payment);
+        return res.send({
+          status: true,
+          modifyParcel: result,
+          trackingId: trackingId,
+          transactionId: session.payment_intent,
+          paymentInfo: paymentResult,
+        });
       }
     });
 
