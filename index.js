@@ -207,9 +207,11 @@ async function run() {
     app.get("/pending-orders", async (req, res) => {
       const owner_email = req.query.email;
       const status = req.query.status;
+      const payment_status = req.query.payment_status;
       const query = {
         owner_email,
         status,
+        payment_status,
       };
       const result = await orderedProductsCollection
         .find(query)
@@ -301,6 +303,13 @@ async function run() {
       );
       // log-tracking
       logTracking(trackingId, status);
+      res.send(result);
+    });
+
+    app.delete("/delete-order/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await orderedProductsCollection.deleteOne(query);
       res.send(result);
     });
 
