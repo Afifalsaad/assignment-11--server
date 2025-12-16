@@ -8,7 +8,7 @@ const stripe = require("stripe")(process.env.STRIPE_ID);
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-var serviceAccount = require("./AdminSDK/assignment11-196f4-firebase-adminsdk-fbsvc-57f07e7886.json");
+var serviceAccount = require("./AdminSDK/assignment11-196f4-firebase-adminsdk-fbsvc-f94a6fb13c.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
