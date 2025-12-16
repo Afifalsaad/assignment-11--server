@@ -2,10 +2,17 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 require("dotenv").config();
-const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId, Admin } = require("mongodb");
 const port = process.env.PORT || 3000;
 const stripe = require("stripe")(process.env.STRIPE_ID);
 const crypto = require("crypto");
+const admin = require("firebase-admin");
+
+var serviceAccount = require("./AdminSDK/assignment11-196f4-firebase-adminsdk-fbsvc-57f07e7886.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 function generateTrackingId() {
   const random = crypto.randomBytes(5).toString("hex").toUpperCase();
@@ -15,6 +22,26 @@ function generateTrackingId() {
 // middleware
 app.use(express.json());
 app.use(cors());
+
+const verifyFBToken = async (req, res, next) => {
+  const token = req.headers?.authorization;
+
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+
+  try {
+    const idToken = token.split(" ")[1];
+    const decode = await admin.auth().verifyIdToken(idToken);
+    // console.log("Decoded", decode);
+    req.access_email = decode.email;
+    console.log("req", req);
+
+    next();
+  } catch (err) {
+    return res.status(401).send({ message: "Forbidden" });
+  }
+};
 
 const uri = `mongodb+srv://${process.env.MONGODB_USER}:${process.env.MONGODB_PASS}@cluster0.avcddas.mongodb.net/?appName=Cluster0`;
 
@@ -53,7 +80,7 @@ async function run() {
     };
 
     // Users Related APIs
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyFBToken, async (req, res) => {
       const cursor = usersCollection.find();
       const result = await cursor.toArray();
       res.send(result);
@@ -109,7 +136,7 @@ async function run() {
       res.send({ result, totalProducts: count });
     });
 
-    app.get("/my-products", async (req, res) => {
+    app.get("/my-products", verifyFBToken, async (req, res) => {
       const email = req.query.email;
       const query = { email };
       const result = await productsCollection
@@ -188,7 +215,7 @@ async function run() {
     });
 
     // Orders Related APIs
-    app.get("/my-orders", async (req, res) => {
+    app.get("/my-orders", verifyFBToken, async (req, res) => {
       const email = req.query.email;
       const query = { email };
       const result = await orderedProductsCollection
@@ -204,7 +231,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/pending-orders", async (req, res) => {
+    app.get("/pending-orders", verifyFBToken, async (req, res) => {
       const owner_email = req.query.email;
       const status = req.query.status;
       const payment_status = req.query.payment_status;
@@ -220,7 +247,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/approved-order", async (req, res) => {
+    app.get("/approved-order", verifyFBToken, async (req, res) => {
       const email = req.query.email;
       const status = req.query.status;
       const query = { owner_email: email, status };
