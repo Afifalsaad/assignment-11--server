@@ -86,6 +86,13 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/user/status", async (req, res) => {
+      const email = req.query.email;
+      const query = { userEmail: email };
+      const result = await usersCollection.findOne(query);
+      res.send(result);
+    });
+
     app.get("/users/:email/role", async (req, res) => {
       const email = req.params.email;
       const query = { userEmail: email };
@@ -428,6 +435,13 @@ async function run() {
     });
 
     // Suspend related APIs
+    app.get("/suspend-feedback/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { userId: id };
+      const result = await suspendedCollection.findOne(query);
+      res.send(result);
+    });
+
     app.post("/suspend/:id", async (req, res) => {
       const reason = req.body;
       const id = req.params.id;
@@ -435,7 +449,6 @@ async function run() {
       reason.userId = id;
       const updatedRole = {
         $set: {
-          role: "suspended",
           status: "suspended",
         },
       };
