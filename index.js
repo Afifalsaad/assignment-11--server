@@ -35,7 +35,6 @@ const verifyFBToken = async (req, res, next) => {
     const decode = await admin.auth().verifyIdToken(idToken);
     // console.log("Decoded", decode);
     req.access_email = decode.email;
-    console.log("req", req);
 
     next();
   } catch (err) {
@@ -79,6 +78,32 @@ async function run() {
       return result;
     };
 
+    // middle ware for verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.access_email;
+      const query = { userEmail: email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user.role !== "admin") {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+
+      next();
+    };
+
+    // middle ware for verify admin
+    const verifyManager = async (req, res, next) => {
+      const email = req.access_email;
+      const query = { userEmail: email };
+      const user = await usersCollection.findOne(query);
+
+      if (!user || user.role !== "Manager") {
+        return res.status(403).send({ message: "Forbidden Access" });
+      }
+
+      next();
+    };
+
     // Users Related APIs
     app.get("/users", verifyFBToken, async (req, res) => {
       const cursor = usersCollection.find();
@@ -100,20 +125,25 @@ async function run() {
       res.send(result.role);
     });
 
-    app.patch("/users/:id/role", async (req, res) => {
-      const id = req.params.id;
-      const role = req.body.role;
-      const status = req.body.status;
-      const query = { _id: new ObjectId(id) };
-      const updatedRole = {
-        $set: {
-          role: role,
-          status: status,
-        },
-      };
-      const result = await usersCollection.updateOne(query, updatedRole);
-      res.send(result);
-    });
+    app.patch(
+      "/users/:id/role",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const role = req.body.role;
+        const status = req.body.status;
+        const query = { _id: new ObjectId(id) };
+        const updatedRole = {
+          $set: {
+            role: role,
+            status: status,
+          },
+        };
+        const result = await usersCollection.updateOne(query, updatedRole);
+        res.send(result);
+      }
+    );
 
     app.post("/users", async (req, res) => {
       const userInfo = req.body;
@@ -129,7 +159,7 @@ async function run() {
     });
 
     // Products Related APIs
-    app.get("/all-products", async (req, res) => {
+    app.get("/all-products", verifyFBToken, async (req, res) => {
       const { limit, skip } = req.query;
       const cursor = productsCollection
         .find()
@@ -153,7 +183,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/all-products-limited", async (req, res) => {
+    app.get("/all-products-limited", verifyFBToken, async (req, res) => {
       const query = {};
       if (req.query.show_on_home) {
         query.show_on_home = req.query.show_on_home === "true";
@@ -166,14 +196,14 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/productDetails/:id", async (req, res) => {
+    app.get("/productDetails/:id", verifyFBToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await productsCollection.findOne(query);
       res.send(result);
     });
 
-    app.post("/products", async (req, res) => {
+    app.post("/products", verifyFBToken, verifyManager, async (req, res) => {
       const productDetails = req.body;
       productDetails.show_on_home = false;
       productDetails.createdAt = new Date();
@@ -181,45 +211,60 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/updateProduct/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const productInfo = req.body;
-      const updatedInfo = {
-        $set: {
-          name: productInfo.name,
-          description: productInfo.description,
-          category: productInfo.category,
-          image: productInfo.image,
-          demo_video: productInfo.demo_video,
-          payment_option: productInfo.payment_option,
-          updated_by: productInfo.updated_by,
-        },
-      };
-      const result = await productsCollection.updateOne(query, updatedInfo);
-      res.send(result);
-    });
+    app.patch(
+      "/updateProduct/:id",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const productInfo = req.body;
+        const updatedInfo = {
+          $set: {
+            name: productInfo.name,
+            description: productInfo.description,
+            category: productInfo.category,
+            image: productInfo.image,
+            demo_video: productInfo.demo_video,
+            payment_option: productInfo.payment_option,
+            updated_by: productInfo.updated_by,
+          },
+        };
+        const result = await productsCollection.updateOne(query, updatedInfo);
+        res.send(result);
+      }
+    );
 
-    app.patch("/show-on-home/:id", async (req, res) => {
-      const id = req.params.id;
-      const show_on_home = req.body.show_on_home;
-      const query = { _id: new ObjectId(id) };
-      const updatedInfo = {
-        $set: {
-          show_on_home: !show_on_home,
-          clickedAt: new Date(),
-        },
-      };
-      const result = await productsCollection.updateOne(query, updatedInfo);
-      res.send(result);
-    });
+    app.patch(
+      "/show-on-home/:id",
+      verifyAdmin,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const show_on_home = req.body.show_on_home;
+        const query = { _id: new ObjectId(id) };
+        const updatedInfo = {
+          $set: {
+            show_on_home: !show_on_home,
+            clickedAt: new Date(),
+          },
+        };
+        const result = await productsCollection.updateOne(query, updatedInfo);
+        res.send(result);
+      }
+    );
 
-    app.delete("/delete-product/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await productsCollection.deleteOne(query);
-      res.send(result);
-    });
+    app.delete(
+      "/delete-product/:id",
+      verifyFBToken,
+      verifyManager,
+      async (req, res) => {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await productsCollection.deleteOne(query);
+        res.send(result);
+      }
+    );
 
     // Orders Related APIs
     app.get("/my-orders", verifyFBToken, async (req, res) => {
@@ -232,7 +277,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/all-orders", async (req, res) => {
+    app.get("/all-orders", verifyFBToken, async (req, res) => {
       const cursor = orderedProductsCollection.find().sort({ orderedAt: -1 });
       const result = await cursor.toArray();
       res.send(result);
