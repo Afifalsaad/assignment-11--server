@@ -2,13 +2,20 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 require("dotenv").config();
-const { MongoClient, ServerApiVersion, ObjectId, Admin } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 3000;
 const stripe = require("stripe")(process.env.STRIPE_ID);
 const crypto = require("crypto");
 const admin = require("firebase-admin");
 
-var serviceAccount = require("./AdminSDK/assignment11-196f4-firebase-adminsdk-fbsvc-f94a6fb13c.json");
+// var serviceAccount = require("./AdminSDK/assignment11-196f4-firebase-adminsdk-fbsvc-f94a6fb13c.json");
+
+// const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -56,7 +63,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const db = client.db("assignment_11_DB");
     const usersCollection = db.collection("users");
@@ -159,7 +166,7 @@ async function run() {
     });
 
     // Products Related APIs
-    app.get("/all-products", verifyFBToken, async (req, res) => {
+    app.get("/all-products", async (req, res) => {
       const { limit, skip } = req.query;
       const cursor = productsCollection
         .find()
@@ -173,7 +180,7 @@ async function run() {
       res.send({ result, totalProducts: count });
     });
 
-    app.get("/my-products", verifyFBToken, async (req, res) => {
+    app.get("/my-products", async (req, res) => {
       const email = req.query.email;
       const query = { email };
       const result = await productsCollection
@@ -183,7 +190,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/all-products-limited", verifyFBToken, async (req, res) => {
+    app.get("/all-products-limited", async (req, res) => {
       const query = {};
       if (req.query.show_on_home) {
         query.show_on_home = req.query.show_on_home === "true";
@@ -196,14 +203,14 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/productDetails/:id", verifyFBToken, async (req, res) => {
+    app.get("/productDetails/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await productsCollection.findOne(query);
       res.send(result);
     });
 
-    app.post("/products", verifyFBToken, verifyManager, async (req, res) => {
+    app.post("/products", async (req, res) => {
       const productDetails = req.body;
       productDetails.show_on_home = false;
       productDetails.createdAt = new Date();
@@ -235,29 +242,23 @@ async function run() {
       }
     );
 
-    app.patch(
-      "/show-on-home/:id",
-      verifyAdmin,
-      verifyAdmin,
-      async (req, res) => {
-        const id = req.params.id;
-        const show_on_home = req.body.show_on_home;
-        const query = { _id: new ObjectId(id) };
-        const updatedInfo = {
-          $set: {
-            show_on_home: !show_on_home,
-            clickedAt: new Date(),
-          },
-        };
-        const result = await productsCollection.updateOne(query, updatedInfo);
-        res.send(result);
-      }
-    );
+    app.patch("/show-on-home/:id", async (req, res) => {
+      const id = req.params.id;
+      const show_on_home = req.body.show_on_home;
+      const query = { _id: new ObjectId(id) };
+      const updatedInfo = {
+        $set: {
+          show_on_home: !show_on_home,
+          clickedAt: new Date(),
+        },
+      };
+      const result = await productsCollection.updateOne(query, updatedInfo);
+      res.send(result);
+    });
 
     app.delete(
       "/delete-product/:id",
       verifyFBToken,
-      verifyManager,
       async (req, res) => {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
@@ -427,7 +428,6 @@ async function run() {
       const sessionId = req.query.session_id;
 
       const session = await stripe.checkout.sessions.retrieve(sessionId);
-      console.log(session);
       const trackingId = session.metadata.trackingId;
       const transactionId = session.payment_intent;
       const query = { transactionId: transactionId };
@@ -487,7 +487,7 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/suspend/:id", async (req, res) => {
+    app.post("/suspend/:id", verifyFBToken, verifyAdmin, async (req, res) => {
       const reason = req.body;
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
@@ -512,11 +512,24 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/trackings/stats", async (req, res) => {
+      const pipeline = [
+        {
+          $group: {
+            _id: "$status",
+            count: { $sum: 1 },
+          },
+        },
+      ];
+      const result = await trackingsCollection.aggregate(pipeline).toArray();
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     //   await client.close();
@@ -525,7 +538,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("assignment-11");
+  res.send("Hello There");
 });
 
 app.listen(port, () => {
